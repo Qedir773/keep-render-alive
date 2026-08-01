@@ -1,0 +1,37 @@
+name: Keep Render Services Alive
+
+on:
+  # Hər 10 dəqiqədən bir avtomatik işə sal
+  schedule:
+    - cron: '*/10 * * * *'
+  # Manual olaraq da işə sala bilərsiniz (Actions tab → Run workflow)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping all Render services
+        run: |
+          echo "Keep-alive ping - $(date -u)"
+          echo "================================"
+          for url in \
+            "https://qerarlari-avtomatik-yazdirma.onrender.com/" \
+            "https://sivi-yarat.onrender.com/" \
+            "https://evtap.onrender.com/"
+          do
+            echo ""
+            echo "→ Pinging: $url"
+            status=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 -L "$url" || echo "TIMEOUT")
+            echo "  Status: $status"
+            if [ "$status" = "200" ]; then
+              echo "  ✅ UP"
+            elif [ "$status" = "TIMEOUT" ]; then
+              echo "  ⏱️  TIMEOUT (sayt cold start ola bilər)"
+            else
+              echo "  ⚠️ Got $status"
+            fi
+          done
+          echo ""
+          echo "================================"
+          echo "Ping tamamlandı"
