@@ -1,9 +1,9 @@
 name: Keep Render Services Alive
 
 on:
-  # Hər 10 dəqiqədən bir avtomatik işə sal
+  # Hər 5 dəqiqədən bir avtomatik işə sal (GitHub Actions minimum)
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/5 * * * *'
   # Manual olaraq da işə sala bilərsiniz (Actions tab → Run workflow)
   workflow_dispatch:
 
