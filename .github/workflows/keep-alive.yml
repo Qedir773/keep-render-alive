@@ -11,33 +11,27 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping all Render services (yalnız 09:00-22:00 Bakı vaxtında)
+      - name: Ping qerarlari-avtomatik-yazdirma (yalnız 09:00-22:00 Bakı vaxtında)
         run: |
           hour=$(TZ="Asia/Baku" date +%H)
           echo "Bakı vaxtı: ${hour}:00"
           if [ "$hour" -ge 22 ] || [ "$hour" -lt 9 ]; then
-            echo "🌙 Gecə saatları (22:00-09:00 Bakı) - bu aralıqda fəaliyyət dayandırılıb, heç bir sayta ping göndərilmir."
+            echo "🌙 Gecə saatları (22:00-09:00 Bakı) - bu aralıqda fəaliyyət dayandırılıb, ping göndərilmir."
             exit 0
           fi
           echo "Keep-alive ping - $(date -u)"
           echo "================================"
-          for url in \
-            "https://qerarlari-avtomatik-yazdirma.onrender.com/" \
-            "https://sivi-yarat.onrender.com/" \
-            "https://evtap.onrender.com/"
-          do
-            echo ""
-            echo "→ Pinging: $url"
-            status=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 -L "$url" || echo "TIMEOUT")
-            echo "  Status: $status"
-            if [ "$status" = "200" ]; then
-              echo "  ✅ UP"
-            elif [ "$status" = "TIMEOUT" ]; then
-              echo "  ⏱️ TIMEOUT (sayt cold start ola bilər)"
-            else
-              echo "  ⚠️ Got $status"
-            fi
-          done
+          url="https://qerarlari-avtomatik-yazdirma.onrender.com/"
+          echo "→ Pinging: $url"
+          status=$(curl -o /dev/null -s -w "%{http_code}" --max-time 30 -L "$url" || echo "TIMEOUT")
+          echo "  Status: $status"
+          if [ "$status" = "200" ]; then
+            echo "  ✅ UP"
+          elif [ "$status" = "TIMEOUT" ]; then
+            echo "  ⏱️ TIMEOUT (sayt cold start ola bilər)"
+          else
+            echo "  ⚠️ Got $status"
+          fi
           echo ""
           echo "================================"
           echo "Ping tamamlandı"
