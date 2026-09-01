@@ -1,9 +1,9 @@
 name: Keep Render Services Alive
 
 on:
-  # Hər 5 dəqiqədən bir avtomatik işə sal (GitHub Actions minimum)
+  # Hər 5 dəqiqədən bir avtomatik işə sal, YALNIZ Bakı vaxtı ilə 09:00-22:00 aralığında (05:00-18:00 UTC)
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/5 5-17 * * *'
   # Manual olaraq da işə sala bilərsiniz (Actions tab → Run workflow)
   workflow_dispatch:
 
@@ -11,8 +11,14 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping all Render services
+      - name: Ping all Render services (yalnız 09:00-22:00 Bakı vaxtında)
         run: |
+          hour=$(TZ="Asia/Baku" date +%H)
+          echo "Bakı vaxtı: ${hour}:00"
+          if [ "$hour" -ge 22 ] || [ "$hour" -lt 9 ]; then
+            echo "🌙 Gecə saatları (22:00-09:00 Bakı) - bu aralıqda fəaliyyət dayandırılıb, heç bir sayta ping göndərilmir."
+            exit 0
+          fi
           echo "Keep-alive ping - $(date -u)"
           echo "================================"
           for url in \
@@ -27,7 +33,7 @@ jobs:
             if [ "$status" = "200" ]; then
               echo "  ✅ UP"
             elif [ "$status" = "TIMEOUT" ]; then
-              echo "  ⏱️  TIMEOUT (sayt cold start ola bilər)"
+              echo "  ⏱️ TIMEOUT (sayt cold start ola bilər)"
             else
               echo "  ⚠️ Got $status"
             fi
