@@ -1,0 +1,27 @@
+name: Repo Heartbeat
+
+# GitHub qaydası: repoda 60 gün ərzində HEÇ BİR push (commit) olmasa,
+# bütün scheduled workflow-lar (o cümlədən keep-alive.yml) avtomatik
+# deaktiv edilir. Sadəcə workflow run-larının işləməsi bunun qarşısını
+# almır — repoya əsl push lazımdır. Bu iş ayda bir dəfə boş bir commit
+# atıb bu "aktivsizlik saatını" sıfırlayır.
+
+on:
+  schedule:
+    - cron: '17 6 1 * *'  # hər ayın 1-i, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boş heartbeat commit at
+        run: |
+          git config user.name "keep-alive-bot"
+          git config user.email "actions@github.com"
+          git commit --allow-empty -m "chore: repo heartbeat (60 günlük deaktivasiya qaydasının qarşısını almaq üçün)"
+          git push
