@@ -1,17 +1,49 @@
 name: Keep Render Services Alive
 
+# ─────────────────────────────────────────────────────────────────────
+# NİYƏ SAYT YENƏ YUXUYA GEDİRDİ?
+#
+# 1) Render Free planı bir web servisi 15 dəqiqə heç bir trafik almasa
+#    yuxuya keçirir (rəsmi qayda: "spins down a Free web service that
+#    goes 15 minutes without receiving any inbound traffic").
+#
+# 2) Bu workflow hər 5 dəqiqədə bir işə düşməli idi — nəzəri baxımdan
+#    kifayət qədər tez-tez. AMMA GitHub Actions-un planlaşdırılmış
+#    (schedule) tetiklərinin DƏQİQ vaxtında işə düşəcəyinə zəmanət
+#    yoxdur: GitHub-un öz sənədlərinə görə yüklənmə yüksək olan
+#    dəqiqələrdə (məs. hər saatın başlanğıcı, "00" və "05" kimi round
+#    dəqiqələr) run gecikə və ya HEÇ İŞƏ DÜŞMƏYƏ bilər. Köhnə cron
+#    (`*/5 5-17 * * *`) məhz bu "izdihamlı" dəqiqələrə düşürdü, ona
+#    görə də bəzən 15+ dəqiqəlik boşluq yaranıb sayt yuxuya gedirdi.
+#
+# HƏLL:
+#  a) Cron-u "izdihamlı" dəqiqələrdən yayındırdıq (2-dən başlayır).
+#  b) Ən vacibi: hər run daxilində BİR YOX, BİR NEÇƏ dəfə ping edirik
+#     (aralarında bir neçə dəqiqə fasilə ilə). Beləliklə, xarici
+#     tetikləyici gecikəndə və ya bir dəfə buraxılanda belə, əvvəlki
+#     run-un "quyruğu" boşluğu doldurur və 15 dəqiqəlik həddə çatmır.
+#  c) `concurrency` ilə üst-üstə düşən run-ları təmizləyirik ki, yeni
+#     tetiklənən run köhnəsini əvəz etsin, yığılıb qalmasın.
+# ─────────────────────────────────────────────────────────────────────
+
 on:
-  # Hər 5 dəqiqədən bir avtomatik işə sal, YALNIZ Bakı vaxtı ilə 09:00-22:00 aralığında (05:00-18:00 UTC)
   schedule:
-    - cron: '*/5 5-17 * * *'
-  # Manual olaraq da işə sala bilərsiniz (Actions tab → Run workflow)
+    # Hər 5 dəqiqədə bir, YALNIZ Bakı vaxtı ilə 09:00-22:00 aralığında
+    # (05:00-18:00 UTC). Dəqiqələr "2" -dən başlayır ki, GitHub-un ən
+    # izdihamlı olduğu tam dəqiqələrə (00, 05, 10...) düşməsin.
+    - cron: '2-59/5 5-17 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: keep-alive-ping
+  cancel-in-progress: true
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Ping qerarlari-avtomatik-yazdirma (yalnız 09:00-22:00 Bakı vaxtında)
+      - name: Ping qerarlari-avtomatik-yazdirma (təkrarlı, gecikmələrə davamlı)
         run: |
           hour=$(TZ="Asia/Baku" date +%H)
           echo "Bakı vaxtı: ${hour}:00"
@@ -19,19 +51,26 @@ jobs:
             echo "🌙 Gecə saatları (22:00-09:00 Bakı) - bu aralıqda fəaliyyət dayandırılıb, ping göndərilmir."
             exit 0
           fi
-          echo "Keep-alive ping - $(date -u)"
-          echo "================================"
+
           url="https://qerarlari-avtomatik-yazdirma.onrender.com/"
-          echo "→ Pinging: $url"
-          status=$(curl -o /dev/null -s -w "%{http_code}" --max-time 60 -L "$url" || echo "TIMEOUT")
-          echo "  Status: $status"
-          if [ "$status" = "200" ]; then
-            echo "  ✅ UP"
-          elif [ "$status" = "TIMEOUT" ]; then
-            echo "  ⏱️ TIMEOUT (sayt cold start ola bilər)"
-          else
-            echo "  ⚠️ Got $status"
-          fi
-          echo ""
+
+          ping_once() {
+            n="$1"
+            echo "→ Ping #${n}: $(date -u +%H:%M:%S) UTC — ${url}"
+            status=$(curl -o /dev/null -s -w "%{http_code}" --max-time 60 --retry 2 --retry-delay 5 -L "$url" || echo "TIMEOUT")
+            if [ "$status" = "200" ]; then
+              echo "  ✅ UP (status $status)"
+            elif [ "$status" = "TIMEOUT" ]; then
+              echo "  ⏱️ TIMEOUT (sayt cold start ola bilər, yenə də oyandırma cəhdi sayılır)"
+            else
+              echo "  ⚠️ Status: $status"
+            fi
+          }
+
           echo "================================"
-          echo "Ping tamamlandı"
+          ping_once 1
+          echo "→ 4 dəqiqə gözlənilir (GitHub cron gecikməsinə qarşı ehtiyat ping)..."
+          sleep 240
+          ping_once 2
+          echo "================================"
+          echo "Run tamamlandı."
